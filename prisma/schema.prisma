@@ -35,11 +35,14 @@ model Habit {
   userId        String
   title         String
   description   String?
-  
+  streak        Int       @default(0)
   mode          HabitMode @default(ATOMIC)
   difficulty    Int       @default(1)
   stakeAmount   Float?
-
+startDate     DateTime  @default(now())
+  endDate       DateTime? // Null = Không bao giờ kết thúc
+  reminders     String?   // Lưu JSON string: ["08:00", "20:00"]
+  checkInCount  Int       @default(0) // Đếm tổng số lần check-in để tính Level sau này
   // --- CÁC TRƯỜNG MỚI DỰA TRÊN ẢNH ---
   frequency     String    @default("daily") // daily, weekly
   goalCount     Int       @default(1)       // 1 lần/ngày
@@ -81,4 +84,5 @@ model HabitLog {
 
   habit          Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checklistState String?
 }

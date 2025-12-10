@@ -1,5 +1,5 @@
 'use client';
-
+import { HabitFormModal } from './HabitFormModal'; // Import mới
 import { useState } from 'react';
 import { Dropdown, MenuProps, Modal, Input, InputNumber, Button, App, message } from 'antd';
 import { 
@@ -20,7 +20,7 @@ interface HabitContextWrapperProps {
 export const HabitContextWrapper = ({ children, habit, date, onOptimisticUpdate }: HabitContextWrapperProps) => {
   const router = useRouter();
   const { message: msg } = App.useApp();
-  
+  const [isEditOpen, setIsEditOpen] = useState(false);
   // State cho Modal Ghi chú
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [noteContent, setNoteContent] = useState('');
@@ -149,7 +149,7 @@ export const HabitContextWrapper = ({ children, habit, date, onOptimisticUpdate 
       key: 'edit',
       label: 'Chỉnh sửa thói quen',
       icon: <EditOutlined />,
-      onClick: () => router.push(`/habits/${habit.id}/edit`), // Tính năng sau này
+      onClick: () => setIsEditOpen(true),
     }
   ];
 
@@ -159,6 +159,13 @@ export const HabitContextWrapper = ({ children, habit, date, onOptimisticUpdate 
         {children}
       </Dropdown>
 
+      {isEditOpen && (
+          <HabitFormModal 
+            open={isEditOpen} 
+            onClose={() => setIsEditOpen(false)} 
+            initialData={habit} // QUAN TRỌNG: Truyền data cũ vào để sửa
+          />
+      )}
       {/* MODAL GHI CHÚ */}
       <Modal 
         title="Ghi chú cho ngày này" 

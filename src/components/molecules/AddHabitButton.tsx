@@ -3,7 +3,7 @@
 import { Button } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useState } from 'react';
-import { CreateHabitModal } from '../organisms/CreateHabitModal';
+import { HabitFormModal } from '../organisms/HabitFormModal';
 
 export const AddHabitButton = () => {
   const [open, setOpen] = useState(false);
@@ -20,7 +20,7 @@ export const AddHabitButton = () => {
           Thói quen mới
       </Button>
 
-      <CreateHabitModal open={open} onClose={() => setOpen(false)} />
+      <HabitFormModal open={open} onClose={() => setOpen(false)} />
     </>
   );
 };

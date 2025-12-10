@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
 import { db } from '@/lib/db';
 import { auth } from '@/auth';
-
+import { recalculateStreak } from '@/lib/streak';
 // 1. METHOD PATCH: Dùng để Update hoặc Tạo mới Log (Check-in)
 export async function PATCH(
   req: Request,
@@ -19,7 +19,7 @@ export async function PATCH(
     const { id } = await params;
     const body = await req.json();
     // Lấy thêm 'note' từ body nếu có
-    const { progress, status, date, note } = body; 
+    const { progress, status, date, note, checklistState } = body; 
 
     // QUAN TRỌNG: Xác định ngày cần sửa (Lấy từ body gửi lên, nếu không có thì lấy hôm nay)
     const targetDate = date ? new Date(date) : new Date();
@@ -42,32 +42,35 @@ export async function PATCH(
     if (!habit) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     if (existingLog) {
-        // UPDATE
-        const updatedLog = await db.habitLog.update({
+        await db.habitLog.update({
             where: { id: existingLog.id },
             data: {
                 currentValue: progress,
                 status: status,
                 targetValue: habit.goalCount,
-                note: note !== undefined ? note : existingLog.note, // Cập nhật note nếu có
+                note: note !== undefined ? note : existingLog.note,
+                checklistState: checklistState !== undefined ? checklistState : (existingLog?.checklistState || null)
             }
         });
-        return NextResponse.json(updatedLog);
     } else {
-        // CREATE
-        const newLog = await db.habitLog.create({
+        await db.habitLog.create({
             data: {
                 habitId: id,
                 userId: userId,
                 currentValue: progress || 0,
                 targetValue: habit.goalCount,
                 status: status || 'IN_PROGRESS',
-                completedAt: targetDate, // Lưu đúng ngày được chọn
+                completedAt: targetDate,
                 note: note || null,
+                checklistState: checklistState !== undefined ? checklistState : (existingLog?.checklistState || null)
             }
         });
-        return NextResponse.json(newLog);
     }
+
+    // --- QUAN TRỌNG: TÍNH LẠI STREAK SAU KHI SỬA LOG ---
+    await recalculateStreak(id); 
+
+    return NextResponse.json({ message: "Updated" });
   });
 }
 
@@ -101,7 +104,9 @@ export async function DELETE(
         completedAt: { gte: start, lte: end }
       }
     });
+await recalculateStreak(id);
 
+    
     return NextResponse.json({ message: "Reset successfully" });
   });
 }
