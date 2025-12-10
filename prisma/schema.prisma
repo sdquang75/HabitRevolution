@@ -72,7 +72,9 @@ model HabitLog {
   habitId        String
   userId         String
   completedAt    DateTime @default(now())
-  
+  currentValue   Float    @default(0)   // Lưu giá trị hiện tại (VD: 3)
+  targetValue    Float    @default(1)   // Lưu mục tiêu lúc đó (VD: 5) - Để sau này habit đổi mục tiêu thì log cũ ko sai
+  status         String   @default("DONE") // DONE, SKIPPED, FAILED
   // Logic "The Suck Log" - Ghi lại nỗi đau
   sufferingScore Int      @default(0) // 0: Dễ ợt - 10: Cực hình nhưng vẫn làm
   note           String?  // Ghi chú nhật ký

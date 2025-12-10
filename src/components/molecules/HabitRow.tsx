@@ -1,230 +1,254 @@
 'use client';
-
-import { useState } from 'react';
-import { Dropdown, MenuProps, Progress, Button, InputNumber, Tag, App, Modal } from 'antd';
+import { HabitContextWrapper } from '../organisms/HabitContextWrapper';
+import { useState, useEffect } from 'react';
+import { Dropdown, MenuProps, Progress, Button, InputNumber, App, Tag } from 'antd';
 import {
-  CheckCircleOutlined, CloseCircleOutlined,
-  StepForwardOutlined, EditOutlined,
-  HistoryOutlined, DeleteOutlined,
+  CheckCircleFilled, CloseCircleFilled, StepForwardFilled,
+  EditOutlined, DeleteOutlined, MoreOutlined,
   PlusOutlined, MinusOutlined,
   ThunderboltFilled, SmileFilled
 } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
-import { message } from 'antd';
-
+import dayjs from 'dayjs';
 
 interface HabitRowProps {
   habit: any;
+  onRefresh: () => void;
+  selectedDate: Date; // <--- Biến selectedDate được khai báo ở đây
 }
 
-export const HabitRow = ({ habit, onRefresh }: { habit: any, onRefresh: () => void }) => {
-  // State lưu giá trị tạm thời ở Client để UI phản hồi ngay lập tức (Optimistic UI)
-  const [currentVal, setCurrentVal] = useState(habit.logs?.[0]?.currentValue || 0);
+export const HabitRow = ({ habit, onRefresh, selectedDate }: HabitRowProps) => {
+  // 1. Tìm log của ngày được chọn (Không phải lúc nào cũng là hôm nay)
+  const getLogForDate = () => {
+    return habit.logs.find((l: any) => 
+      dayjs(l.completedAt).isSame(dayjs(selectedDate), 'day')
+    );
+  };
+
+  const initialLog = getLogForDate();
+
+  // 2. Khai báo State (Đây là chỗ cậu bị lỗi thiếu setCurrentVal)
+  const [currentVal, setCurrentVal] = useState(initialLog?.currentValue || 0);
+  const [status, setStatus] = useState(initialLog?.status || 'IN_PROGRESS'); 
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  
   const { message, modal } = App.useApp();
+  const router = useRouter();
 
   const goal = habit.goalCount || 1;
   const isBeast = habit.mode === 'BEAST';
   const unit = habit.goalUnit || 'lần';
-
-  // --- LOGIC MENU CHUỘT PHẢI (CONTEXT MENU) ---
-  const menuItems: MenuProps['items'] = [
-    {
-      key: 'done',
-      label: 'Đánh dấu hoàn thành',
-      icon: <CheckCircleOutlined className="text-emerald-500" />,
-      onClick: () => handleQuickAction('DONE'),
-    },
-    {
-      key: 'input',
-      label: 'Nhập tiến độ cụ thể...',
-      icon: <EditOutlined />,
-      children: [
-        {
-          key: 'input_number',
-          label: (
-            <div className="p-2" onClick={(e) => e.stopPropagation()}>
-              <InputNumber
-                min={0} max={goal}
-                defaultValue={currentVal}
-                onChange={(val) => setCurrentVal(val || 0)}
-              />
-              <Button type="link" size="small">Lưu</Button>
-            </div>
-          )
-        }
-      ]
-    },
-    { type: 'divider' },
-    {
-      key: 'skip',
-      label: 'Đánh dấu bỏ qua',
-      icon: <StepForwardOutlined />,
-      disabled: isBeast, // BEAST MODE KHÔNG ĐƯỢC BỎ QUA (Phát triển thêm)
-      danger: false,
-    },
-    {
-      key: 'fail',
-      label: 'Đánh dấu thất bại',
-      icon: <CloseCircleOutlined />,
-      danger: true, // Màu đỏ
-    },
-    { type: 'divider' },
-    {
-      key: 'delete',
-      label: 'Xóa thói quen',
-      icon: <DeleteOutlined />,
-      danger: true,
-      onClick: () => handleDelete(),
-    }
-  ];
-
-  const handleQuickAction = (type: string) => {
-    if (type === 'DONE') updateProgress(goal);
-    if (type === 'FAIL') { /* Logic đánh dấu thất bại */ }
+const handleOptimisticUpdate = (val: number, newStatus: string) => {
+      setCurrentVal(val);
+      setStatus(newStatus);
   };
+  // 3. EFFECT: Khi người dùng đổi ngày (selectedDate thay đổi) -> Reset lại UI theo ngày đó
+  useEffect(() => {
+    const log = getLogForDate();
+    setCurrentVal(log?.currentValue || 0);
+    setStatus(log?.status || 'IN_PROGRESS');
+  }, [selectedDate, habit]);
 
-  const handleDelete = () => {
-    modal.confirm({
-      title: 'Bạn chắc chắn muốn xóa?',
-      content: 'Hành động này không thể hoàn tác.',
-      okText: 'Xóa luôn',
-      okType: 'danger',
-      cancelText: 'Hủy',
-      onOk: () => {
-        // Gọi API xóa ở đây
-        message.success('Đã xóa!');
-        router.refresh();
-      }
-    });
-  }
-
-  // --- LOGIC HOVER CONTROL ---
-  const handleIncrement = (val: number) => {
-    const newVal = Math.min(Math.max(0, currentVal + val), goal);
-    setCurrentVal(newVal);
-    // Debounce call API here
-  };
-  const updateProgress = async (newVal: number) => {
-    // 1. Chặn nếu đang loading hoặc giá trị không đổi
-    if (loading || newVal < 0) return;
-
-    // 2. Cập nhật UI ngay lập tức (để user không thấy lag)
+  // --- CORE FUNCTION: GỌI API ---
+  const submitLog = async (val: number, newStatus: string) => {
+    if (loading) return;
     const oldVal = currentVal;
-    setCurrentVal(newVal);
+    const oldStatus = status;
+
+    // Optimistic Update
+    setCurrentVal(val);
+    setStatus(newStatus);
     setLoading(true);
+
     try {
-      // 3. Gọi API
       const res = await fetch(`/api/habits/${habit.id}/log`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ progress: newVal }),
+        body: JSON.stringify({ 
+            progress: val, 
+            status: newStatus,
+            date: selectedDate // Gửi ngày đang chọn lên Server
+        }),
       });
 
       if (!res.ok) throw new Error();
-
-      // 4. Nếu thành công -> Refresh lại dashboard để cập nhật Streak
-      onRefresh();
-      message.success('Đã cập nhật tiến độ!');
+      
+      onRefresh(); 
+      if (newStatus === 'DONE' && oldStatus !== 'DONE') message.success('Đã cập nhật!');
 
     } catch (error) {
-      // 5. Nếu lỗi -> Hoàn tác lại giá trị cũ
       setCurrentVal(oldVal);
+      setStatus(oldStatus);
       message.error('Lỗi kết nối');
     } finally {
       setLoading(false);
     }
   };
-  return (<div
-    onDoubleClick={() => window.dispatchEvent(new CustomEvent('openHabitDetail', { detail: habit }))}>
-    <Dropdown menu={{ items: menuItems }} trigger={['contextMenu']}>
-      <div
+
+  // --- HANDLERS ---
+  const handleIncrement = (delta: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newVal = Math.min(Math.max(0, currentVal + delta), goal);
+    const newStatus = newVal >= goal ? 'DONE' : 'IN_PROGRESS';
+    submitLog(newVal, newStatus);
+  };
+
+  const handleQuickAction = (action: 'DONE' | 'SKIP' | 'FAIL') => {
+    if (action === 'DONE') submitLog(goal, 'DONE');
+    if (action === 'SKIP') submitLog(currentVal, 'SKIPPED');
+    if (action === 'FAIL') submitLog(currentVal, 'FAILED');
+  };
+
+  const handleDelete = () => {
+    modal.confirm({
+        title: 'Xóa thói quen này?',
+        content: 'Dữ liệu lịch sử cũng sẽ bị xóa.',
+        okType: 'danger',
+        onOk: async () => {
+             try {
+                 await fetch(`/api/habits/${habit.id}`, { method: 'DELETE' });
+                 message.success('Đã xóa');
+                 onRefresh();
+             } catch (e) {
+                 message.error('Lỗi khi xóa');
+             }
+        }
+    });
+  };
+
+  // --- MENU ITEMS ---
+  const menuItems: MenuProps['items'] = [
+    {
+      key: 'done',
+      label: 'Hoàn thành ngay',
+      icon: <CheckCircleFilled className="text-emerald-500" />,
+      onClick: () => handleQuickAction('DONE'),
+    },
+    {
+      key: 'input',
+      label: 'Nhập số tay...',
+      icon: <EditOutlined />,
+      children: [{
+          key: 'input_num',
+          label: (
+            <div onClick={e => e.stopPropagation()} className="p-1">
+                 <InputNumber 
+                    min={0} max={goal} value={currentVal} 
+                    onChange={(v) => submitLog(v || 0, (v || 0) >= goal ? 'DONE' : 'IN_PROGRESS')}
+                 />
+            </div>
+          )
+      }]
+    },
+    { type: 'divider' },
+    {
+      key: 'skip',
+      label: 'Bỏ qua ngày này',
+      icon: <StepForwardFilled />,
+      disabled: isBeast, 
+      onClick: () => handleQuickAction('SKIP'),
+    },
+    {
+      key: 'fail',
+      label: 'Đánh dấu Thất bại',
+      icon: <CloseCircleFilled className="text-red-500" />,
+      danger: true,
+      onClick: () => handleQuickAction('FAIL'),
+    },
+    { type: 'divider' },
+    {
+      key: 'delete',
+      label: 'Xóa',
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: handleDelete
+    }
+  ];
+
+  // --- RENDER ---
+  const isDone = status === 'DONE' || currentVal >= goal;
+  const isSkipped = status === 'SKIPPED';
+  const isFailed = status === 'FAILED';
+
+  let rowBg = 'bg-white';
+  if (isDone) rowBg = 'bg-emerald-50';
+  if (isSkipped) rowBg = 'bg-gray-100 opacity-60';
+  if (isFailed) rowBg = 'bg-red-50';
+
+  return (
+    <HabitContextWrapper habit={habit} date={selectedDate} onOptimisticUpdate={handleOptimisticUpdate}>
+      <div 
+        onDoubleClick={() => window.dispatchEvent(new CustomEvent('openHabitDetail', { detail: habit }))}
         className={`
-            group flex items-center justify-between p-4 mb-3 bg-white rounded-xl border-l-4 shadow-sm 
-            hover:shadow-md transition-all duration-200 cursor-default
-            ${isBeast ? 'border-l-force-main' : 'border-l-atomic-main'}
+            group relative flex items-center justify-between p-3 sm:p-4 mb-3 rounded-xl border border-gray-100 shadow-sm 
+            transition-all duration-200 select-none cursor-default
+            ${rowBg}
+            ${isBeast ? 'border-l-4 border-l-force-main' : 'border-l-4 border-l-atomic-main'}
+            hover:shadow-md
         `}
       >
-        {/* CỘT 1: ICON & INFO */}
-        <div className="flex items-center gap-4 flex-1">
-          {/* Icon tròn */}
-          <div className={`
-            w-10 h-10 rounded-full flex items-center justify-center text-lg
-            ${isBeast ? 'bg-red-100 text-force-main' : 'bg-emerald-100 text-atomic-main'}
-          `}>
-            {isBeast ? <ThunderboltFilled /> : <SmileFilled />}
-          </div>
+        <div className="flex items-center gap-3 sm:gap-4 flex-1 overflow-hidden">
+             <div className={`
+                flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg transition-colors
+                ${isDone ? 'bg-green-500 text-white' : (isBeast ? 'bg-red-100 text-force-main' : 'bg-emerald-100 text-atomic-main')}
+             `}>
+                {isDone ? <CheckCircleFilled /> : (isBeast ? <ThunderboltFilled /> : <SmileFilled />)}
+             </div>
 
-          <div>
-            <h4 className="font-bold text-gray-800 m-0 text-base">{habit.title}</h4>
-            <div className="text-xs text-gray-500 flex gap-2 mt-1">
-              {/* Chỉ hiện Tag khi không hover, hover vào sẽ hiện control khác nếu muốn */}
-              <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-600">
-                {habit.frequency === 'daily' ? 'Hàng ngày' : 'Hàng tuần'}
-              </span>
-              {isBeast && <span className="text-red-500 font-bold">Phạt: {habit.stakeAmount?.toLocaleString()}đ</span>}
+             <div className="min-w-0">
+                <h4 className={`font-bold m-0 text-sm sm:text-base truncate ${isDone ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                    {habit.title}
+                </h4>
+                <div className="flex items-center gap-2 text-xs mt-1">
+                    <Tag className="m-0 text-[10px] sm:text-xs border-0 bg-gray-200/50">
+                        {currentVal}/{goal} {unit}
+                    </Tag>
+                    {isBeast && !isDone && <span className="text-force-main font-bold text-[10px] sm:text-xs">-{habit.stakeAmount}đ</span>}
+                </div>
+             </div>
+        </div>
+
+        <div className="flex items-center gap-2 sm:gap-4">
+            <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity duration-200 items-center gap-2 bg-white/80 backdrop-blur rounded-lg px-2 py-1 shadow-sm absolute right-16">
+                 <Button 
+                    type="text" shape="circle" size="small" icon={<MinusOutlined />} 
+                    onClick={(e) => handleIncrement(-1, e)}
+                    disabled={isDone || currentVal <= 0}
+                 />
+                 <span className="font-bold w-6 text-center">{currentVal}</span>
+                 <Button 
+                    type="primary" shape="circle" size="small" icon={<PlusOutlined />} 
+                    onClick={(e) => handleIncrement(1, e)}
+                    disabled={isDone}
+                    className={isBeast ? 'bg-force-main' : 'bg-atomic-main'}
+                 />
             </div>
-          </div>
-        </div>
 
-        {/* CỘT 2: PROGRESS & HOVER ACTION (PHÁT TRIỂN THÊM) */}
-        <div className="flex items-center gap-4 w-48 justify-end relative">
+            <div className="md:hidden flex items-center gap-1">
+                 {!isDone && (
+                    <Button 
+                        size="small" shape="circle" icon={<PlusOutlined />} 
+                        type="primary" ghost
+                        onClick={(e) => handleIncrement(1, e)}
+                    />
+                 )}
+                 <Dropdown menu={{ items: menuItems }} trigger={['click']}>
+                    <Button type="text" size="small" icon={<MoreOutlined />} onClick={e => e.stopPropagation()} />
+                 </Dropdown>
+            </div>
 
-          {/* TRẠNG THÁI BÌNH THƯỜNG (Hiện Text) */}
-          <div className="group-hover:opacity-0 transition-opacity duration-200 absolute right-0 flex flex-col items-end">
-            <span className={`font-bold text-lg ${currentVal >= goal ? 'text-green-600' : 'text-gray-700'}`}>
-              {currentVal}/{goal}
-            </span>
-            <span className="text-xs text-gray-400">{unit}</span>
-          </div>
-
-          {/* TRẠNG THÁI HOVER (Hiện Nút bấm) */}
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-2 bg-white pl-4">
-            {/* Nếu đơn vị là phút/km -> Hiện Input, Nếu là lần -> Hiện +/- */}
-            {['phút', 'km', 'trang'].includes(unit) ? (
-              <div className="flex items-center gap-1">
-                <InputNumber
-                  size="small"
-                  min={0} max={goal}
-                  value={currentVal}
-                  onChange={(v) => setCurrentVal(v || 0)}
-                  style={{ width: 60 }}
+            <div className="relative">
+                <Progress 
+                    type="circle" 
+                    percent={Math.round((currentVal / goal) * 100)} 
+                    width={36} 
+                    strokeColor={isBeast ? '#ef4444' : '#10b981'}
+                    showInfo={false}
+                    className="opacity-80"
                 />
-                <span className="text-xs text-gray-500">/{goal}</span>
-              </div>
-            ) : (
-              <>
-                <Button
-                  shape="circle" size="small" icon={<MinusOutlined />}
-                  onClick={() => handleIncrement(-1)}
-                  disabled={currentVal <= 0}
-                />
-                <span className="font-bold w-8 text-center">{currentVal}</span>
-                <Button
-                  shape="circle" size="small" icon={<PlusOutlined />}
-                  type="primary" ghost
-                  onClick={() => handleIncrement(1)}
-                  disabled={currentVal >= goal}
-                />
-              </>
-            )}
-          </div>
+            </div>
         </div>
-
-        {/* CỘT 3: CIRCULAR PROGRESS (Nhỏ gọn bên phải cùng) */}
-        <div className="ml-4">
-          <Progress
-            type="circle"
-            percent={Math.round((currentVal / goal) * 100)}
-            width={40}
-            strokeColor={isBeast ? '#ef4444' : '#10b981'}
-            format={() => null} // Ẩn số % đi cho gọn
-          />
-        </div>
-
       </div>
-    </Dropdown></div>
+    </HabitContextWrapper>
   );
-
 };
