@@ -1,0 +1,19 @@
+{
+  "Auth": {
+    "loginTitle": "Chào mừng trở lại",
+    "loginSubtitle": "Kỷ luật là cầu nối giữa mục tiêu và thành tựu.",
+    "registerTitle": "Tạo tài khoản mới",
+    "registerSubtitle": "1% tốt hơn mỗi ngày bắt đầu từ đây.",
+    "emailPlaceholder": "Email của bạn",
+    "passwordPlaceholder": "Mật khẩu",
+    "btn_login": "Đăng Nhập",
+    "btn_register": "Đăng Ký",
+    "link_forgot": "Quên mật khẩu?",
+    "link_create": "Tạo ngay (Miễn phí)",
+    "link_login": "Đăng nhập ngay",
+    "validation_required": "Vui lòng nhập trường này!"
+  },
+  "Common": {
+    "loading": "Đang tải..."
+  }
+}

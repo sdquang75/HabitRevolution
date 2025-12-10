@@ -1,0 +1,82 @@
+// File: prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// --- MODELS ---
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  name            String?
+  level           Int        @default(1) // Level hiện tại (Gamification)
+  xp              Int        @default(0) // Điểm kinh nghiệm
+  emergencyHearts Int        @default(3) // Số mạng sống (cho chế độ Force)
+  createdAt       DateTime   @default(now())
+  password        String
+  habits          Habit[]
+  logs            HabitLog[]
+}
+
+// Enum để phân loại chế độ chơi
+enum HabitMode {
+  ATOMIC  // Dễ: Xây dựng thói quen (Xanh lá)
+  BEAST   // Khó: Kỷ luật thép (Đỏ/Đen)
+}
+
+model Habit {
+  id            String    @id @default(cuid())
+  userId        String
+  title         String
+  description   String?
+  
+  mode          HabitMode @default(ATOMIC)
+  difficulty    Int       @default(1)
+  stakeAmount   Float?
+
+  // --- CÁC TRƯỜNG MỚI DỰA TRÊN ẢNH ---
+  frequency     String    @default("daily") // daily, weekly
+  goalCount     Int       @default(1)       // 1 lần/ngày
+  goalUnit      String    @default("lần")   // lần, phút, km
+  
+  // Lưu thời điểm dưới dạng JSON String (VD: ["morning", "evening"])
+  // SQLite không hỗ trợ mảng native tốt nên dùng String xử lý ở code
+  timeOfDay     String    @default("any")   
+  
+  // Checklist con (Dùng bảng riêng hoặc JSON, ở đây dùng bảng riêng cho xịn)
+  checklist     HabitChecklist[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs          HabitLog[]
+}
+
+model HabitChecklist {
+  id        String  @id @default(cuid())
+  habitId   String
+  content   String
+  isDone    Boolean @default(false)
+  
+  habit     Habit   @relation(fields: [habitId], references: [id], onDelete: Cascade)
+}
+model HabitLog {
+  id             String   @id @default(cuid())
+  habitId        String
+  userId         String
+  completedAt    DateTime @default(now())
+  
+  // Logic "The Suck Log" - Ghi lại nỗi đau
+  sufferingScore Int      @default(0) // 0: Dễ ợt - 10: Cực hình nhưng vẫn làm
+  note           String?  // Ghi chú nhật ký
+
+  habit          Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

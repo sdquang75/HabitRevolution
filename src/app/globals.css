@@ -1,5 +1,5 @@
 @import "tailwindcss";
-
+ /*
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -23,4 +23,21 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+} */
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+/* Reset mặc định để Ant Design không bị vỡ font */
+body {
+  color: rgb(var(--foreground-rgb));
+  background: white; /* Mặc định nền trắng */
 }

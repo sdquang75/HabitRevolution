@@ -1,0 +1,19 @@
+{
+  "Auth": {
+    "loginTitle": "Welcome Back",
+    "loginSubtitle": "Discipline is the bridge between goals and accomplishment.",
+    "registerTitle": "Create Account",
+    "registerSubtitle": "1% better every day starts here.",
+    "emailPlaceholder": "Your Email",
+    "passwordPlaceholder": "Password",
+    "btn_login": "Login",
+    "btn_register": "Register",
+    "link_forgot": "Forgot Password?",
+    "link_create": "Create free account",
+    "link_login": "Login now",
+    "validation_required": "Please input this field!"
+  },
+  "Common": {
+    "loading": "Loading..."
+  }
+}
