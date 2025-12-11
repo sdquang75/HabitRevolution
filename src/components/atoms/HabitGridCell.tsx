@@ -61,7 +61,7 @@ export const HabitGridCell = ({ habit, date }: HabitGridCellProps) => {
                 }),
             });
             router.refresh();
-            message.success('Đã lưu');
+            // message.success('Đã lưu');
         } catch (e) {
             message.error('Lỗi');
         } finally {

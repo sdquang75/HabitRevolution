@@ -41,7 +41,7 @@ model Habit {
   stakeAmount   Float?
 startDate     DateTime  @default(now())
   endDate       DateTime? // Null = Không bao giờ kết thúc
-  reminders     String?   // Lưu JSON string: ["08:00", "20:00"]
+ 
   checkInCount  Int       @default(0) // Đếm tổng số lần check-in để tính Level sau này
   // --- CÁC TRƯỜNG MỚI DỰA TRÊN ẢNH ---
   frequency     String    @default("daily") // daily, weekly
@@ -60,6 +60,9 @@ startDate     DateTime  @default(now())
 
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   logs          HabitLog[]
+  endConditionType  String    @default("NEVER") 
+  endConditionValue Int?      // VD: 30 (ngày), 100 (lần), 1000 (km)
+  reminders     String?
 }
 
 model HabitChecklist {

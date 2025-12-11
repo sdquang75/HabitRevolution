@@ -1,50 +1,78 @@
 import { db } from '@/lib/db';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export const recalculateStreak = async (habitId: string) => {
-  // 1. Lấy toàn bộ logs của habit này (Sắp xếp mới nhất trước)
   const logs = await db.habitLog.findMany({
     where: { habitId },
     orderBy: { completedAt: 'desc' },
   });
 
-  let streak = 0;
-  // Bắt đầu kiểm tra từ hôm nay
-  let checkDate = dayjs().startOf('day'); 
-  
-  // Logic phụ: Nếu hôm nay chưa log gì cả, thì streak tính từ hôm qua
-  // (Tránh việc vừa sang ngày mới streak bị reset về 0)
-  const hasLogToday = logs.some(l => dayjs(l.completedAt).isSame(checkDate, 'day'));
-  if (!hasLogToday) {
-    checkDate = checkDate.subtract(1, 'day');
+  if (logs.length === 0) {
+    // Nếu không có log nào -> Streak = 0
+    await db.habit.update({ where: { id: habitId }, data: { streak: 0 } });
+    return 0;
   }
 
-  // 2. Vòng lặp kiểm tra quá khứ
-  // Chúng ta sẽ lặp tối đa 365 ngày hoặc cho đến khi đứt chuỗi
+  // Map log theo Key ngày (YYYY-MM-DD) để tra cứu nhanh
+  const logMap: Record<string, any> = {};
+  logs.forEach(log => {
+    // Lưu ý: completedAt trong DB là UTC. Ta format về YYYY-MM-DD
+    const dateKey = dayjs(log.completedAt).format('YYYY-MM-DD');
+    // Nếu một ngày có nhiều log (do sửa đi sửa lại), lấy log mới nhất
+    if (!logMap[dateKey]) logMap[dateKey] = log;
+  });
+
+  let streak = 0;
+  // Bắt đầu check từ Hôm nay
+  let checkDate = dayjs(); 
+  
+  // Logic quan trọng:
+  // Kiểm tra xem "Hôm nay" đã có log chưa?
+  const todayKey = checkDate.format('YYYY-MM-DD');
+  const todayLog = logMap[todayKey];
+
+  // Nếu hôm nay CÓ log mà là FAILED -> Đứt chuỗi ngay lập tức (Streak = 0)
+  if (todayLog && todayLog.status === 'FAILED') {
+      // Dừng luôn, không cần check quá khứ
+      await db.habit.update({ where: { id: habitId }, data: { streak: 0 } });
+      return 0;
+  }
+
+  // Nếu hôm nay chưa có log (hoặc log là IN_PROGRESS), ta cho phép tính tiếp từ Hôm qua
+  // (Để user không bị mất streak ngay khi vừa sang ngày mới)
+  if (!todayLog || todayLog.status === 'IN_PROGRESS') {
+      checkDate = checkDate.subtract(1, 'day');
+  }
+
+  // Vòng lặp đếm ngược 365 ngày
   for (let i = 0; i < 365; i++) {
-    const currentDate = checkDate.subtract(i, 'day');
-    
-    // Tìm log của ngày đang check
-    const log = logs.find(l => dayjs(l.completedAt).isSame(currentDate, 'day'));
+    const dateKey = checkDate.format('YYYY-MM-DD');
+    const log = logMap[dateKey];
 
     if (!log) {
-      // Nếu không có log -> ĐỨT CHUỖI (Trừ khi habit không yêu cầu làm ngày này - Future Feature)
-      // Tạm thời coi như không làm là đứt
+      // Không có log -> Đứt chuỗi
       break; 
     }
 
     if (log.status === 'DONE') {
       streak++;
     } else if (log.status === 'SKIPPED') {
-      // SKIPPED: Cầu nối bảo lưu streak (Không tăng, nhưng không làm đứt)
-      continue;
+      // Skipped -> Bảo lưu chuỗi, đi tiếp ngày hôm trước
+      // (Không tăng streak, nhưng không break)
     } else {
-      // FAILED hoặc IN_PROGRESS (của quá khứ) -> ĐỨT CHUỖI
+      // FAILED hoặc trạng thái lạ -> Đứt chuỗi
       break;
     }
+
+    // Lùi về ngày hôm trước
+    checkDate = checkDate.subtract(1, 'day');
   }
 
-  // 3. Cập nhật con số Streak mới vào bảng Habit
   await db.habit.update({
     where: { id: habitId },
     data: { streak: streak }

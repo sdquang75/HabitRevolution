@@ -82,27 +82,34 @@ export const HabitRow = ({ habit, onRefresh, selectedDate }: HabitRowProps) => {
     submitLog(newVal, newStatus);
   };
 
-  // --- RENDER VISUALS ---
-  const isDone = status === 'DONE' || currentVal >= goal;
-  const isFailed = status === 'FAILED';
-  const isSkipped = status === 'SKIPPED';
-  
-  let cardClass = "bg-white border-gray-100";
-  let iconColor = isBeast ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-500";
-  
-  if (isDone) {
-      cardClass = "bg-emerald-50/40 border-emerald-100 opacity-90";
-      iconColor = "bg-emerald-500 text-white";
-  } else if (isFailed) {
-      cardClass = "bg-red-50/40 border-red-100 opacity-90";
-      iconColor = "bg-red-500 text-white";
-  } else if (isSkipped) {
-      cardClass = "bg-gray-50 border-gray-200 opacity-60 grayscale";
-      iconColor = "bg-gray-300 text-white";
-  }
+// --- RENDER VISUALS ---
+const isDone = status === 'DONE' || currentVal >= goal;
+const isFailed = status === 'FAILED';
+const isSkipped = status === 'SKIPPED';
 
-  const percent = Math.min(100, Math.round((currentVal / goal) * 100));
+let cardClass = "bg-white border-gray-100";
+let iconColor = isBeast ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-500";
+// Màu sắc cho Progress Bar
+let progressColor = isBeast ? 'bg-red-500' : 'bg-emerald-500';
 
+if (isDone) {
+    cardClass = "bg-emerald-50/40 border-emerald-100 opacity-90";
+    iconColor = "bg-emerald-500 text-white";
+    progressColor = "bg-emerald-500";
+} else if (isFailed) {
+    // Thất bại: Nền đỏ nhạt, Icon đỏ đậm
+    cardClass = "bg-red-50/60 border-red-200 opacity-90";
+    iconColor = "bg-red-500 text-white";
+    progressColor = "bg-red-500"; // Bar màu đỏ
+} else if (isSkipped) {
+    cardClass = "bg-gray-50 border-gray-200 opacity-60 grayscale";
+    iconColor = "bg-gray-400 text-white";
+    progressColor = "bg-gray-300";
+}
+
+// Nếu Thất bại -> Progress Bar nên Full (để hiện màu đỏ rõ ràng) hoặc Empty tùy sở thích
+// Ở đây tớ để Full 100% nhưng màu đỏ để cảnh báo
+const percent = isFailed ? 100 : Math.min(100, Math.round((currentVal / goal) * 100));
   // Render trạng thái khóa (Không active)
   if (!active) {
       // ... (Giữ nguyên code render trạng thái khóa như bài trước)
@@ -168,7 +175,7 @@ export const HabitRow = ({ habit, onRefresh, selectedDate }: HabitRowProps) => {
                     </div>
                  ) : (
                     // Nếu xong rồi thì hiện text đơn giản
-                    <div className="text-sm font-bold text-emerald-600">Đã xong</div>
+                    <div className="text-sm font-bold text-emerald-600"></div>
                  )}
             </div>
 
@@ -196,8 +203,10 @@ export const HabitRow = ({ habit, onRefresh, selectedDate }: HabitRowProps) => {
         
         {/* Progress Bar chạy dưới đáy Card */}
         <div className="absolute bottom-0 left-0 h-1 bg-gray-100 w-full rounded-b-2xl overflow-hidden">
-             <div className={`h-full transition-all duration-500 ${isBeast ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${percent}%` }} />
-        </div>
+           <div 
+                className={`h-full transition-all duration-500 ${progressColor}`} 
+                style={{ width: `${percent}%` }} 
+             />  </div>
       </div>
     </HabitContextWrapper>
   );

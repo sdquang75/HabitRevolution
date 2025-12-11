@@ -7,10 +7,7 @@ import { HabitDetailDrawer } from '@/components/organisms/HabitDetailDrawer';
 import { AddHabitButton } from '@/components/molecules/AddHabitButton';
 import { useRouter } from 'next/navigation';
 import { Segmented, DatePicker, Button, Collapse, Divider, Empty } from 'antd';
-import { 
-  UnorderedListOutlined, AppstoreOutlined, LeftOutlined, RightOutlined, 
-  CheckCircleOutlined, CaretRightOutlined, CloseCircleOutlined, StopOutlined 
-} from '@ant-design/icons';
+import { UnorderedListOutlined, AppstoreOutlined, LeftOutlined, RightOutlined, CheckCircleOutlined, CaretRightOutlined, CloseCircleOutlined, StopOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useHabitNotification } from '@/hooks/useHabitNotification';
 
@@ -24,9 +21,7 @@ export const HabitBoard = ({ habits }: { habits: any[] }) => {
 
   const handleRefresh = () => router.refresh();
 
-  // --- LOGIC PHÂN LOẠI MỚI (CHIA 4 NHÓM) ---
-// --- LOGIC PHÂN LOẠI MỚI (CHIA 4 NHÓM) ---
-  // THÊM ĐOẠN ĐỊNH NGHĨA KIỂU NÀY VÀO SAU useMemo:
+  // --- LOGIC PHÂN LOẠI ---
   const { todoList, successList, skippedList, failedList } = useMemo<{ 
     todoList: any[]; 
     successList: any[]; 
@@ -59,158 +54,120 @@ export const HabitBoard = ({ habits }: { habits: any[] }) => {
     return { todoList: todo, successList: success, skippedList: skipped, failedList: failed };
   }, [habits, selectedDate]);
 
-  // Helper render danh sách habit trong Collapse
   const renderHabitList = (list: any[]) => (
     <div className="space-y-2 opacity-80 hover:opacity-100 transition-opacity duration-300">
-      {list.map((habit) => (
-        <HabitRow
-          key={habit.id}
-          habit={habit}
-          onRefresh={handleRefresh}
-          selectedDate={selectedDate.toDate()}
-        />
+      {list.map((habit: any) => (
+        <HabitRow key={habit.id} habit={habit} onRefresh={handleRefresh} selectedDate={selectedDate.toDate()} />
       ))}
     </div>
   );
 
   return (
-    <div className="relative min-h-[calc(100vh-80px)] overflow-hidden">
+    // 1. CONTAINER CHÍNH: CỐ ĐỊNH CHIỀU CAO (QUAN TRỌNG NHẤT)
+    // h-[calc(100vh-64px)]: Chiều cao màn hình trừ đi Header chính của App (thường là 64px)
+    // overflow-hidden: Cắt bỏ mọi thứ tràn ra ngoài -> Không bao giờ hiện thanh cuộn trình duyệt
+    <div className="relative h-[calc(100vh-64px)] flex flex-col bg-gray-50/30 overflow-hidden">
       
-      {/* HEADER CONTROLS */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-white p-3 rounded-2xl shadow-sm border border-gray-100 sticky top-2 z-10 backdrop-blur-md bg-white/90 mx-4 mt-2">
-        <Segmented
-          options={[
-            { label: 'Danh sách', value: 'List', icon: <UnorderedListOutlined /> },
-            { label: 'Lưới', value: 'Grid', icon: <AppstoreOutlined /> },
-          ]}
-          value={viewMode}
-          onChange={(val: any) => setViewMode(val)}
-        />
+      {/* 2. HEADER CONTROLS: CỐ ĐỊNH (flex-none) */}
+      <div className="flex-none px-4 py-3 bg-white/80 backdrop-blur-md border-b border-gray-200 z-20">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-3 max-w-4xl mx-auto w-full">
+            <Segmented
+                options={[
+                { label: 'Danh sách', value: 'List', icon: <UnorderedListOutlined /> },
+                { label: 'Lưới', value: 'Grid', icon: <AppstoreOutlined /> },
+                ]}
+                value={viewMode}
+                onChange={(val: any) => setViewMode(val)}
+            />
 
-        <div className="flex items-center gap-3">
-           <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1 border border-gray-200">
-              <Button type="text" size="small" icon={<LeftOutlined />} onClick={() => setSelectedDate(d => d.subtract(1, 'day'))} />
-              <DatePicker
-                value={selectedDate}
-                onChange={(date) => setSelectedDate(date || dayjs())}
-                format="DD/MM/YYYY"
-                allowClear={false}
-                className="font-bold w-32 text-center border-none bg-transparent shadow-none"
-                suffixIcon={false}
-              />
-              <Button
-                type="text"
-                size="small"
-                icon={<RightOutlined />}
-                onClick={() => setSelectedDate(d => d.add(1, 'day'))}
-                disabled={selectedDate.isSame(dayjs(), 'day')}
-              />
-           </div>
-           <AddHabitButton />
+            <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 shadow-sm">
+                    <Button type="text" size="small" icon={<LeftOutlined />} onClick={() => setSelectedDate(d => d.subtract(1, 'day'))} />
+                    <DatePicker
+                        value={selectedDate}
+                        onChange={(date) => setSelectedDate(date || dayjs())}
+                        format="DD/MM/YYYY"
+                        allowClear={false}
+                        className="font-bold w-28 text-center border-none bg-transparent shadow-none"
+                        suffixIcon={false}
+                    />
+                    <Button type="text" size="small" icon={<RightOutlined />} onClick={() => setSelectedDate(d => d.add(1, 'day'))} disabled={selectedDate.isSame(dayjs(), 'day')} />
+                </div>
+                <AddHabitButton />
+            </div>
         </div>
       </div>
 
-      {/* BODY CONTENT */}
-      {viewMode === 'List' ? (
-        <div className="flex flex-col gap-4 max-w-4xl mx-auto pb-20 px-4">
+      {/* 3. SCROLLABLE AREA: TỰ CUỘN (flex-1) */}
+      {/* flex-1: Chiếm toàn bộ không gian còn lại */}
+      {/* overflow-y-auto: Nếu nội dung dài quá thì hiện thanh cuộn RIÊNG cho vùng này */}
+      <div className="flex-1 overflow-y-auto scroll-smooth p-4 custom-scrollbar">
+        <div className="max-w-4xl mx-auto pb-20"> {/* pb-20 để nội dung cuối không bị che */}
+            
+            {viewMode === 'List' ? (
+                <div className="flex flex-col gap-4">
+                    {/* TODO LIST */}
+                    <div className="space-y-3">
+                        {todoList.length > 0 ? (
+                            todoList.map((habit: any) => (
+                                <HabitRow key={habit.id} habit={habit} onRefresh={handleRefresh} selectedDate={selectedDate.toDate()} />
+                            ))
+                        ) : (
+                            successList.length > 0 && (
+                                <div className="text-center py-8 bg-emerald-50 rounded-2xl border border-emerald-100 mb-4">
+                                    <CheckCircleOutlined className="text-5xl text-emerald-500 mb-2 animate-bounce" />
+                                    <h3 className="text-lg font-bold text-emerald-700">All Clear!</h3>
+                                    <p className="text-emerald-600 text-sm">Bạn đã hoàn thành xuất sắc mục tiêu hôm nay.</p>
+                                </div>
+                            )
+                        )}
+                    </div>
 
-          {/* 1. TODO SECTION (LUÔN MỞ) */}
-          <div className="space-y-3">
-            {todoList.length > 0 ? (
-              todoList.map((habit: any) => (
-                <HabitRow
-                  key={habit.id}
-                  habit={habit}
-                  onRefresh={handleRefresh}
-                  selectedDate={selectedDate.toDate()}
-                />
-              ))
-            ) : (
-              // All Clear Logic: Chỉ hiện khi KHÔNG còn việc phải làm VÀ đã có ít nhất 1 việc thành công
-              successList.length > 0 && (
-                <div className="text-center py-10 bg-emerald-50 rounded-3xl border border-emerald-100 mb-6">
-                  <CheckCircleOutlined className="text-6xl text-emerald-500 mb-4 animate-bounce" />
-                  <h3 className="text-xl font-bold text-emerald-700">All Clear!</h3>
-                  <p className="text-emerald-600">Bạn đã hoàn thành xuất sắc mục tiêu hôm nay.</p>
+                    {/* DONE LISTS */}
+                    {(successList.length > 0 || skippedList.length > 0 || failedList.length > 0) && (
+                        <div className="mt-2">
+                            <Divider orientation="left" className="!text-gray-400 !font-normal !text-xs uppercase tracking-widest !my-4">
+                                Lịch sử hoạt động
+                            </Divider>
+
+                            <Collapse ghost bordered={false} expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} className="text-gray-400" />}>
+                                {successList.length > 0 && (
+                                    <Panel header={<div className="flex items-center gap-2 text-emerald-600 font-medium"><CheckCircleOutlined /> Thành công ({successList.length})</div>} key="success">
+                                        {renderHabitList(successList)}
+                                    </Panel>
+                                )}
+                                {skippedList.length > 0 && (
+                                    <Panel header={<div className="flex items-center gap-2 text-gray-500 font-medium"><StopOutlined /> Bỏ qua ({skippedList.length})</div>} key="skipped">
+                                        {renderHabitList(skippedList)}
+                                    </Panel>
+                                )}
+                                {failedList.length > 0 && (
+                                    <Panel header={<div className="flex items-center gap-2 text-red-500 font-medium"><CloseCircleOutlined /> Thất bại ({failedList.length})</div>} key="failed">
+                                        {renderHabitList(failedList)}
+                                    </Panel>
+                                )}
+                            </Collapse>
+                        </div>
+                    )}
+
+                    {/* EMPTY STATE */}
+                    {todoList.length === 0 && successList.length === 0 && skippedList.length === 0 && failedList.length === 0 && (
+                        <div className="text-center mt-20">
+                            <Empty description="Chưa có thói quen nào" />
+                            <div className="mt-4 text-gray-400 text-sm">Bấm nút (+) ở góc trên để bắt đầu</div>
+                        </div>
+                    )}
                 </div>
-              )
+            ) : (
+                // GRID VIEW
+                <div className="overflow-x-auto pb-4"> {/* Grid cần scroll ngang nếu quá rộng */}
+                    <HabitGrid habits={habits} startDate={selectedDate.toDate()} />
+                </div>
             )}
-          </div>
-
-          {/* 2. COMPLETED SECTIONS (MẶC ĐỊNH ĐÓNG) */}
-          {(successList.length > 0 || skippedList.length > 0 || failedList.length > 0) && (
-            <div className="mt-4">
-              <Divider orientation="left" className="!text-gray-400 !font-normal !text-xs uppercase tracking-widest !mb-2">
-                Lịch sử hoạt động
-              </Divider>
-
-              <Collapse 
-                ghost 
-                bordered={false} 
-                // defaultActiveKey={[]} // Mặc định rỗng -> Đóng tất cả
-                expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} className="text-gray-400" />}
-                className="site-collapse-custom-collapse"
-              >
-                {/* NHÓM THÀNH CÔNG */}
-                {successList.length > 0 && (
-                    <Panel 
-                        header={
-                            <div className="flex items-center gap-2 text-emerald-600 font-medium">
-                                <CheckCircleOutlined /> Thành công ({successList.length})
-                            </div>
-                        } 
-                        key="success"
-                    >
-                        {renderHabitList(successList)}
-                    </Panel>
-                )}
-
-                {/* NHÓM BỎ QUA */}
-                {skippedList.length > 0 && (
-                    <Panel 
-                        header={
-                            <div className="flex items-center gap-2 text-gray-500 font-medium">
-                                <StopOutlined /> Bỏ qua ({skippedList.length})
-                            </div>
-                        } 
-                        key="skipped"
-                    >
-                        {renderHabitList(skippedList)}
-                    </Panel>
-                )}
-
-                {/* NHÓM THẤT BẠI */}
-                {failedList.length > 0 && (
-                    <Panel 
-                        header={
-                            <div className="flex items-center gap-2 text-red-500 font-medium">
-                                <CloseCircleOutlined /> Thất bại ({failedList.length})
-                            </div>
-                        } 
-                        key="failed"
-                    >
-                        {renderHabitList(failedList)}
-                    </Panel>
-                )}
-              </Collapse>
-            </div>
-          )}
-
-          {/* Empty State */}
-          {todoList.length === 0 && successList.length === 0 && skippedList.length === 0 && failedList.length === 0 && (
-            <div className="text-center mt-20">
-              <Empty description="Chưa có thói quen nào" />
-              <div className="mt-4 text-gray-400 text-sm">Bấm nút ở góc trên để thêm mới</div>
-            </div>
-          )}
         </div>
-      ) : (
-        // VIEW GRID
-        <div className="pb-20 px-4">
-          <HabitGrid habits={habits} startDate={selectedDate.toDate()} />
-        </div>
-      )}
+      </div>
 
+      {/* 4. DRAWER (Vẫn nằm trong relative container để phủ đúng vùng) */}
       <HabitDetailDrawer />
     </div>
   );

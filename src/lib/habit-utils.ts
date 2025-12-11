@@ -64,14 +64,31 @@ export const isHabitActive = (habit: any, date: Date | string) => {
   // 1. Kiểm tra Ngày bắt đầu
   if (targetDate.isBefore(start)) return { active: false, reason: 'not_started' };
 
-  // 2. Kiểm tra Ngày kết thúc (Nếu có)
-  if (habit.endDate) {
-    const end = dayjs(habit.endDate).endOf('day');
-    if (targetDate.isAfter(end)) return { active: false, reason: 'ended' };
+// --- LOGIC KẾT THÚC NÂNG CAO ---
+  const type = habit.endConditionType || 'NEVER';
+  const val = habit.endConditionValue || 0;
+
+  // 1. Kết thúc theo Ngày
+  if (type === 'DATE' && habit.endDate) {
+      if (targetDate.isAfter(dayjs(habit.endDate).endOf('day'))) return { active: false, reason: 'ended' };
   }
 
-  // 3. (Phát triển thêm) Kiểm tra Frequency (Ví dụ: Chỉ làm T2, T4, T6)
-  // Logic này sẽ mở rộng sau khi cậu update DB để lưu frequency chi tiết hơn
-  
+  // 2. Kết thúc theo Số lần hoàn thành (COUNT)
+  if (type === 'COUNT') {
+      const doneCount = habit.logs?.filter((l: any) => l.status === 'DONE').length || 0;
+      if (doneCount >= val && targetDate.isAfter(dayjs())) return { active: false, reason: 'completed_quota' };
+  }
+
+  // 3. Kết thúc theo Tổng giá trị (TOTAL) - VD: Chạy đủ 1000km
+  if (type === 'TOTAL') {
+      const total = habit.logs?.reduce((sum: number, l: any) => sum + (l.status === 'DONE' ? l.currentValue : 0), 0) || 0;
+      if (total >= val && targetDate.isAfter(dayjs())) return { active: false, reason: 'completed_goal' };
+  }
+
+  // Beast Mode thì không bao giờ kết thúc trừ khi user xóa
+  if (habit.mode === 'BEAST' && type !== 'NEVER') {
+      // Beast mode overrides endings normally, but we respect explicit setup if logic demands
+  }
+
   return { active: true, reason: 'active' };
 };
