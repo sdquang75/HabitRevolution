@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { Layout, Menu, Button, Avatar, Dropdown, theme } from 'antd';
-import { 
-  MenuFoldOutlined, MenuUnfoldOutlined, 
-  FireOutlined, LogoutOutlined, UserOutlined, SettingOutlined 
+import {
+  MenuFoldOutlined, MenuUnfoldOutlined,
+  FireOutlined, LogoutOutlined, UserOutlined, SettingOutlined
 } from '@ant-design/icons';
 import { signOut, useSession } from 'next-auth/react'; // Hook lấy session
 import { useRouter } from 'next/navigation';
@@ -58,9 +58,9 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
       {/* Sidebar bên trái */}
       <Sider trigger={null} collapsible collapsed={collapsed} className="!bg-gray-900">
         <div className="h-16 flex items-center justify-center">
-             {/* Logo đơn giản */}
-             <FireOutlined className="text-2xl text-atomic-main" />
-             {!collapsed && <span className="ml-2 text-white font-bold text-lg">Habit Evo</span>}
+          {/* Logo đơn giản */}
+          <FireOutlined className="text-2xl text-atomic-main" />
+          {!collapsed && <span className="ml-2 text-white font-bold text-lg">Habit Evo</span>}
         </div>
         <Menu
           theme="dark"
@@ -85,14 +85,14 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
           <div className="mr-4">
             <Dropdown menu={{ items: userMenu }} trigger={['click']}>
               <div className="cursor-pointer flex items-center gap-2 hover:bg-gray-100 px-3 py-1 rounded-full transition">
-                <Avatar 
-                    style={{ backgroundColor: '#10b981' }} 
-                    icon={<UserOutlined />} 
+                <Avatar
+                  style={{ backgroundColor: '#10b981' }}
+                  icon={<UserOutlined />}
                 >
-                    {session?.user?.name?.[0]?.toUpperCase()}
+                  {session?.user?.name?.[0]?.toUpperCase()}
                 </Avatar>
                 <span className="hidden md:block font-medium text-gray-700">
-                    {session?.user?.name}
+                  {session?.user?.name}
                 </span>
               </div>
             </Dropdown>
@@ -102,11 +102,12 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
         {/* Nội dung chính (Page Content) */}
         <Content
           style={{
-            margin: '24px 16px',
-            padding: 24,
+            margin: 0, // Bỏ margin ngoài
+            padding: 0, // Bỏ padding để HabitBoard tràn viền
             minHeight: 280,
             background: colorBgContainer,
             borderRadius: borderRadiusLG,
+            overflow: 'hidden' // Quan trọng: Chặn cuộn ở cấp Layout
           }}
         >
           {children}
